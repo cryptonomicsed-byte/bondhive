@@ -106,7 +106,7 @@ impl UnsignedEvent {
         let keypair = Keypair::from_secret_key(&secp, secret_key);
         let id_bytes = hex::decode(self.id()).expect("sha256 output is valid hex");
         let msg = Message::from_digest_slice(&id_bytes)?;
-        let mut rng = secp256k1::rand::thread_rng();
+        let mut rng = rand::thread_rng();
         let sig = secp.sign_schnorr_with_rng(&msg, &keypair, &mut rng);
         Ok(hex::encode(sig.serialize()))
     }
@@ -213,7 +213,7 @@ fn escape_content(s: &str) -> String {
 
 /// Generate a fresh Nostr keypair (32-byte secret key + x-only public key hex).
 pub fn generate_keypair() -> (String, String) {
-    let mut rng = secp256k1::rand::rngs::OsRng;
+    let mut rng = rand::rngs::OsRng;
     let secp = Secp256k1::new();
     let (sk, _pk) = secp.generate_keypair(&mut rng);
     let keypair = Keypair::from_secret_key(&secp, &sk);
