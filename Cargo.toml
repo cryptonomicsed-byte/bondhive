@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["core", "program"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/block/buzz" # Bondhive is an independent protocol layer; repo lives beside Buzz
+authors = ["Bondhive Contributors"]
+
+[profile.release]
+opt-level = 3
+lto = true

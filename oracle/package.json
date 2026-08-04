@@ -1,0 +1,19 @@
+{
+  "name": "bondhive-oracle",
+  "version": "0.1.0",
+  "description": "Bondhive oracle agent: watches relays for NIP-74 bond events, verifies signatures, aggregates attestations, recommends resolutions",
+  "type": "module",
+  "main": "dist/oracle.js",
+  "scripts": {
+    "build": "tsc",
+    "oracle": "node dist/oracle.js",
+    "oracle:selftest": "node dist/oracle.js --selftest"
+  },
+  "dependencies": {
+    "nostr-tools": "^2.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

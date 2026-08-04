@@ -1,0 +1,16 @@
+[package]
+name = "bondhive-program"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bondhive Solana program: bond escrow, mutual pool staking, slashing, buy-back and burn engine"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+solana-program = "1.18"
+thiserror = "1"
+
+[dev-dependencies]
+# host-side tests exercise logic.rs and state.rs only — no solana runtime needed.
