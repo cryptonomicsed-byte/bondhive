@@ -294,3 +294,64 @@ impl StakerAccount {
         w(data, &mut p, &self.reserved);
     }
 }
+
+/// WitnessVoteAccount — one per (bond, witness) (PDA seed: b"witness_vote" ||
+/// bond_id || witness). Its presence (`version == VERSION`) is the
+/// double-vote guard for `process_attest`: the account is expected
+/// pre-created (zeroed) by the same production wiring that creates
+/// `bond`/`pool`/`staker` accounts; `unpack` on a zeroed buffer yields
+/// `version == 0`, which `process_attest` reads as "not yet voted". Once a
+/// witness attests, `version` is set to `VERSION` and the same witness
+/// attesting again on the same bond is rejected before any vote count
+/// mutates — the same PDA-uniqueness idea as an `init`-only account, applied
+/// to this crate's manual account model instead of Anchor's.
+pub struct WitnessVoteAccount {
+    pub version: u8,
+    pub bond_id: [u8; 32],
+    pub witness: Pubkey,
+    pub verdict: u8,
+}
+
+pub const WITNESS_VOTE_SIZE: usize = 1 + 32 + 32 + 1;
+
+impl WitnessVoteAccount {
+    pub fn size() -> usize {
+        WITNESS_VOTE_SIZE
+    }
+
+    pub fn already_recorded(data: &[u8]) -> bool {
+        !data.is_empty() && data[0] == VERSION
+    }
+
+    pub fn unpack(data: &[u8]) -> Result<Self, &'static str> {
+        if data.len() < WITNESS_VOTE_SIZE {
+            return Err("witness vote account too small");
+        }
+        let mut p = 0usize;
+        let version = data[p];
+        p += 1;
+        let bond_id: [u8; 32] = data[p..p + 32].try_into().unwrap();
+        p += 32;
+        let witness = Pubkey::new_from_array(data[p..p + 32].try_into().unwrap());
+        p += 32;
+        let verdict = data[p];
+        Ok(WitnessVoteAccount {
+            version,
+            bond_id,
+            witness,
+            verdict,
+        })
+    }
+
+    pub fn pack(&self, data: &mut [u8]) {
+        let mut p = 0usize;
+        let mut w = |d: &mut [u8], p: &mut usize, bytes: &[u8]| {
+            d[*p..*p + bytes.len()].copy_from_slice(bytes);
+            *p += bytes.len();
+        };
+        w(data, &mut p, &[self.version]);
+        w(data, &mut p, &self.bond_id);
+        w(data, &mut p, &self.witness.to_bytes());
+        w(data, &mut p, &[self.verdict]);
+    }
+}

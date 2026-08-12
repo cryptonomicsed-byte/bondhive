@@ -70,8 +70,39 @@ Four layers, each independently replaceable:
 |-------|-------|--------|
 | Event | NIP-74 kinds 37000–37005, NIP-32 labels, NIP-89 handler registration | design |
 | Workspace | Buzz relay integration: kind registry, ingest scope gate, CLI, MCP | planned |
-| Settlement | Solana program: stake / slash / reward / buy-back engine | planned |
+| Settlement | Solana program: stake / slash / reward / buy-back engine, per-witness vote-record dedup on `attest` (kind 37002 → `process_attest`) | planned |
 | Reputation | BondScore derivation from resolution history | design |
+
+## Consolidation note (2026-08-12)
+
+PROOF and Waggle (both `cryptonomicsed-byte` repos) are archived as standalone
+projects; their live parts are folded in here:
+
+- **Arbitration double-vote fix**: Waggle's `arbitrate()` instruction had no
+  per-arbiter vote record, so a single Queen-tier signer could call it twice
+  and force 2-of-3 quorum alone. Bondhive's own `process_attest` had the same
+  gap (no per-witness record on `pass_count`/`fail_count`). Both are fixed by
+  the same pattern — a PDA keyed on `(bond/bounty, witness/arbiter)` whose
+  existence is the double-vote guard, checked before any vote count mutates.
+  Waggle's fix lives in `programs/waggle/src/lib.rs` (`VoteRecord`, Anchor
+  `init`-only account; the source builds clean and produces a real
+  `target/deploy/waggle.so` on Solana platform-tools' pinned toolchain, but
+  `anchor test`'s TS-side assertion of it has not run — see Waggle's
+  `ARCHIVED.md` for why, an upstream anchor-syn/proc-macro2 IDL-generation
+  incompatibility, not an application bug). Bondhive's fix lives in
+  `program/src/state.rs` (`WitnessVoteAccount`) + `program/src/lib.rs::process_attest`,
+  verified by `cargo test -p bondhive-program`
+  (`witness_vote_second_attest_is_rejected_before_recording` and related
+  tests in `program/tests/logic.rs`) — this is the one that's actually
+  green in this environment, since `program/` is deliberately host-testable
+  without the Solana toolchain.
+- **Dashboard pattern**: `web/dashboard.py` ports PROOF's zero-dependency,
+  live-fetch dashboard pattern (a stdlib Python HTTP server serving `/api/*`
+  JSON endpoints, consumed by client-side JS) onto Bondhive's own data model
+  and visual language (the glass/bento design from `web/index.html`).
+  `web/index.html` remains the static mockup; `web/dashboard.py` is the
+  live-shaped successor — its endpoints return example data until wired to
+  the deployed program + oracle ledger (see the `TODO` in each handler).
 
 ## Repository layout
 

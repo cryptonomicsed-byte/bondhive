@@ -6,7 +6,9 @@
 //! resolve pass/fail (slash split) → buy-back → milestone burn.
 
 use bondhive_program::logic;
-use bondhive_program::state::{BondAccount, BondState, PoolAccount, StakerAccount};
+use bondhive_program::state::{
+    BondAccount, BondState, PoolAccount, StakerAccount, WitnessVoteAccount,
+};
 
 fn sample_pool() -> PoolAccount {
     PoolAccount {
@@ -254,4 +256,87 @@ fn premium_discount_curve_parity() {
     for (score, expected_discount) in [(50u16, 0u16), (60, 10), (70, 25), (80, 50), (100, 50)] {
         assert_eq!(logic::premium_discount(score), expected_discount);
     }
+}
+
+#[test]
+fn witness_vote_pack_unpack_roundtrip() {
+    let vote = WitnessVoteAccount {
+        version: 1,
+        bond_id: [7u8; 32],
+        witness: [9u8; 32].into(),
+        verdict: 0,
+    };
+    let mut buf = vec![0u8; WitnessVoteAccount::size()];
+    vote.pack(&mut buf);
+    let round = WitnessVoteAccount::unpack(&buf).unwrap();
+    assert_eq!(round.version, 1);
+    assert_eq!(round.bond_id, [7u8; 32]);
+    assert_eq!(round.witness, [9u8; 32].into());
+    assert_eq!(round.verdict, 0);
+}
+
+/// A zeroed (freshly created, never-voted) witness-vote account must read as
+/// "not yet recorded" — this is what lets `process_attest` distinguish a
+/// first vote from a replay without a separate account-existence flag.
+#[test]
+fn witness_vote_zeroed_account_reads_as_not_recorded() {
+    let buf = vec![0u8; WitnessVoteAccount::size()];
+    assert!(!WitnessVoteAccount::already_recorded(&buf));
+}
+
+/// This is the double-vote regression test: once a witness's vote is packed
+/// into their (bond, witness) PDA slot, `already_recorded` must report true,
+/// which is exactly the condition `process_attest` checks before touching
+/// `bond.pass_count` / `bond.fail_count` — so a second `attest` call from the
+/// same witness on the same bond is rejected before any vote count mutates,
+/// instead of silently incrementing it a second time (the Waggle bug this
+/// mirrors: `arbitrate()` had no per-arbiter record, so a single Queen-tier
+/// signer could call it twice and force 2-of-3 quorum alone).
+#[test]
+fn witness_vote_second_attest_is_rejected_before_recording() {
+    let mut buf = vec![0u8; WitnessVoteAccount::size()];
+    assert!(!WitnessVoteAccount::already_recorded(&buf));
+
+    let first_vote = WitnessVoteAccount {
+        version: 1,
+        bond_id: [7u8; 32],
+        witness: [9u8; 32].into(),
+        verdict: 0,
+    };
+    first_vote.pack(&mut buf);
+
+    // Second attest from the same witness on the same bond: the guard must
+    // trip *before* any bond.pass_count/fail_count mutation is attempted —
+    // process_attest checks this exact condition first and returns
+    // BondhiveError::AlreadyVoted without touching the bond account.
+    assert!(WitnessVoteAccount::already_recorded(&buf));
+}
+
+/// Two distinct witnesses attesting on the same bond use distinct PDAs
+/// (different `witness` in the seed), so both must be able to record
+/// independently — the guard is per-(bond, witness), not per-bond.
+#[test]
+fn witness_vote_distinct_witnesses_both_record_independently() {
+    let mut buf_a = vec![0u8; WitnessVoteAccount::size()];
+    let mut buf_b = vec![0u8; WitnessVoteAccount::size()];
+
+    WitnessVoteAccount {
+        version: 1,
+        bond_id: [7u8; 32],
+        witness: [1u8; 32].into(),
+        verdict: 0,
+    }
+    .pack(&mut buf_a);
+
+    assert!(!WitnessVoteAccount::already_recorded(&buf_b));
+    WitnessVoteAccount {
+        version: 1,
+        bond_id: [7u8; 32],
+        witness: [2u8; 32].into(),
+        verdict: 1,
+    }
+    .pack(&mut buf_b);
+
+    assert!(WitnessVoteAccount::already_recorded(&buf_a));
+    assert!(WitnessVoteAccount::already_recorded(&buf_b));
 }

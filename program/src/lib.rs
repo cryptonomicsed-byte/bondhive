@@ -22,7 +22,10 @@ use solana_program::{
     account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, msg,
     program_error::ProgramError, pubkey::Pubkey,
 };
-use state::{BondAccount, BondState, PoolAccount, StakerAccount, STAKER_SIZE};
+use state::{
+    BondAccount, BondState, PoolAccount, StakerAccount, WitnessVoteAccount, STAKER_SIZE,
+    WITNESS_VOTE_SIZE,
+};
 
 entrypoint!(process_instruction);
 
@@ -364,10 +367,24 @@ fn process_attest(
     verdict: u8,
 ) -> ProgramResult {
     let (witness, rest) = split2(accounts)?;
-    let (bond_acct, _) = split2(rest)?;
+    let (bond_acct, rest) = split2(rest)?;
+    let (witness_vote_acct, _) = split2(rest)?;
     check_signer(witness)?;
     let (bkey, _) = pda(program_id, &[b"bond", &bond_id]);
     check_key(bond_acct, &bkey)?;
+    let (vkey, _) = pda(program_id, &[b"witness_vote", &bond_id, witness.key.as_ref()]);
+    check_key(witness_vote_acct, &vkey)?;
+
+    // Double-vote guard: this witness's (bond, witness) PDA must not already
+    // be recorded. Checked before any vote-count mutation on `bond`.
+    let mut vote_data = witness_vote_acct.data.borrow_mut();
+    if vote_data.len() < WITNESS_VOTE_SIZE {
+        return Err(BondhiveError::InvalidAccount.into());
+    }
+    if WitnessVoteAccount::already_recorded(&vote_data) {
+        return Err(BondhiveError::AlreadyVoted.into());
+    }
+
     let mut data = bond_acct.data.borrow_mut();
     let mut bond = BondAccount::unpack(&data).map_err(|_| BondhiveError::BondNotFound)?;
     if bond.state != BondState::Accepted as u8 {
@@ -380,6 +397,15 @@ fn process_attest(
     }
     bond.witness_count = bond.witness_count.saturating_add(1);
     bond.pack(&mut data);
+
+    let vote = WitnessVoteAccount {
+        version: state::VERSION,
+        bond_id,
+        witness: *witness.key,
+        verdict,
+    };
+    vote.pack(&mut vote_data);
+
     msg!("attestation recorded: verdict={verdict}");
     Ok(())
 }

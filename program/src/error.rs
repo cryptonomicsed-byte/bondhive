@@ -31,6 +31,8 @@ pub enum BondhiveError {
     Overflow,
     #[error("unauthorized authority")]
     Unauthorized,
+    #[error("witness has already voted on this bond")]
+    AlreadyVoted,
 }
 
 impl From<BondhiveError> for ProgramError {
