@@ -34,7 +34,7 @@ pub struct PoolAccount {
     pub reserved: [u8; 32],
 }
 
-pub const POOL_SIZE: usize = 1 + 32 + 32 + 8 * 6 + 2 * 4 + 8 * 2 + 4 + 32;
+pub const POOL_SIZE: usize = 1 + 32 + 32 + 8 * 5 + 2 * 4 + 8 * 2 + 4 + 32;
 
 impl PoolAccount {
     pub fn size() -> usize {
@@ -114,6 +114,10 @@ impl PoolAccount {
         w(data, &mut p, &self.milestone_next.to_le_bytes());
         w(data, &mut p, &self.bonds_active.to_le_bytes());
         w(data, &mut p, &self.reserved);
+        debug_assert_eq!(
+            p, POOL_SIZE,
+            "PoolAccount::pack wrote {p} bytes but POOL_SIZE is {POOL_SIZE} — the size constant has drifted from the struct layout"
+        );
     }
 }
 
@@ -147,7 +151,7 @@ pub struct BondAccount {
     pub reserved: [u8; 16],
 }
 
-pub const BOND_SIZE: usize = 1 + 1 + 32 + 32 + 8 * 4 + 1 * 3 + 8 * 3 + 32 + 16;
+pub const BOND_SIZE: usize = 1 + 1 + 32 + 32 + 8 * 3 + 1 * 3 + 8 * 3 + 32 + 16;
 
 impl BondAccount {
     pub fn size() -> usize {
@@ -227,6 +231,10 @@ impl BondAccount {
         w(data, &mut p, &self.resolved_at.to_le_bytes());
         w(data, &mut p, &self.bond_id);
         w(data, &mut p, &self.reserved);
+        debug_assert_eq!(
+            p, BOND_SIZE,
+            "BondAccount::pack wrote {p} bytes but BOND_SIZE is {BOND_SIZE} — the size constant has drifted from the struct layout"
+        );
     }
 }
 
@@ -292,6 +300,10 @@ impl StakerAccount {
         w(data, &mut p, &self.rewards_claimed.to_le_bytes());
         w(data, &mut p, &self.joined_at.to_le_bytes());
         w(data, &mut p, &self.reserved);
+        debug_assert_eq!(
+            p, STAKER_SIZE,
+            "StakerAccount::pack wrote {p} bytes but STAKER_SIZE is {STAKER_SIZE} — the size constant has drifted from the struct layout"
+        );
     }
 }
 
@@ -353,5 +365,9 @@ impl WitnessVoteAccount {
         w(data, &mut p, &self.bond_id);
         w(data, &mut p, &self.witness.to_bytes());
         w(data, &mut p, &[self.verdict]);
+        debug_assert_eq!(
+            p, WITNESS_VOTE_SIZE,
+            "WitnessVoteAccount::pack wrote {p} bytes but WITNESS_VOTE_SIZE is {WITNESS_VOTE_SIZE} — the size constant has drifted from the struct layout"
+        );
     }
 }
