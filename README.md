@@ -139,11 +139,11 @@ cargo test -p buzz-core -p buzz-relay      # exercises kind registration + scope
 cd bondhive/buzz/mcp
 npm install
 npm run build
+npm test                                   # smoke: boots the server on stdio, lists tools
 
-# 5. Web dashboard
+# 5. Web dashboard — zero-dependency Python stdlib server, no npm install needed
 cd bondhive/web
-npm install
-npm run build
+python3 dashboard.py                       # serves the live-shaped dashboard on localhost
 ```
 
 ### Verification commands
@@ -152,8 +152,7 @@ npm run build
 cargo test -p bondhive-core                      # schema + score unit tests
 cargo test -p bondhive-program                   # settlement math (host-logic)
 cargo test -p bondhive-program --lib             # program instruction unit tests
-npm --prefix buzz/mcp test                       # MCP tool contract tests
-npm --prefix web test                            # dashboard smoke tests
+npm --prefix buzz/mcp test                       # MCP tool contract tests (builds + smoke-boots the server)
 ```
 
 All tests must pass and `just ci` must be green (when touching the buzz
@@ -181,7 +180,7 @@ program's upgrade authority and a governance signal.
   registration, ingest gate, `h`-tag scoping, MCP, oracle, CLI, relay
   config, migration plan.
 - `spec/NIP-74.md` — Service Bond event spec (draft, design).
-- `spec/tokenomics.md` — BOND economics (design).
+- `docs/tokenomics.md` — BOND economics (design).
 - `AGENTS.md` — contributor guide for AI agents working on this repo.
 
 ## Status markers
