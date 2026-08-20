@@ -420,6 +420,16 @@ fn process_resolve(
     let (bond_acct, rest) = split2(rest)?;
     let (pool_acct, _) = split2(rest)?;
     check_signer(keeper)?;
+    // Resolve moves real escrowed funds (slash, burn) based solely on the
+    // `outcome` the caller supplies — unlike Attest (which only records an
+    // opinion), this instruction must be restricted to the pool authority
+    // (the oracle/keeper role described in the README), matching the same
+    // check already used for BuybackBurn and SetParams. Checked before any
+    // account data is read/mutated so an unauthorized call fails clean.
+    let mut pool = load_pool(program_id, pool_acct)?;
+    if &pool.authority != keeper.key {
+        return Err(BondhiveError::Unauthorized.into());
+    }
     let (bkey, _) = pda(program_id, &[b"bond", &bond_id]);
     check_key(bond_acct, &bkey)?;
     let mut data = bond_acct.data.borrow_mut();
@@ -427,7 +437,6 @@ fn process_resolve(
     if bond.state != BondState::Accepted as u8 {
         return Err(BondhiveError::WrongBondState.into());
     }
-    let mut pool = load_pool(program_id, pool_acct)?;
     pool.escrow = pool
         .escrow
         .checked_sub(bond.amount)
